@@ -59,7 +59,7 @@ void normalize4d(float* x, float* y, float* z, float* w)
 	*w *= norm_invert;
 }
 
-void getYPR(void)
+void quaternion_to_YPR(void)
 {
 	const float a12 = 2.0f * (q[1] * q[2] + q[0] * q[3]);
 	const float a22 = q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];;
