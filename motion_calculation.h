@@ -13,12 +13,13 @@
 // Madgwick fusion algo setup
 float deltat = 0.0f;
 uint64_t now = 0, lastUpdate = 0;
-float ax=0.0f, ay=0.0f, az=0.0f, gx=0.0f, gy=0.0f, gz=0.0f, mx=0.0f, my=0.0f, mz=0.0f;
-float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
-float yaw_pitch_roll[3] = {0.0f, 0.0f, 0.0f};
 
 float g_qmag = 1.0f;
 float gamma = 0.0f;
+
+float ax=0.0f, ay=0.0f, az=0.0f, gx=0.0f, gy=0.0f, gz=0.0f, mx=0.0f, my=0.0f, mz=0.0f;
+float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+float yaw_pitch_roll[3] = {0.0f, 0.0f, 0.0f};
 
 //float g_bx = 0.0f, g_by = 0.0f, g_bz = 0.0f;
 
@@ -86,9 +87,11 @@ void getYPR(void)
 
 void motion_calculation_init(void)
 {
-	transient_shaper_init(2.0f, 10.0f, 20.0f, -24.0f);
+	// a transient_shaper maybe used to smooth the g_qmag, which is the quaternion changing rate
+	// transient_shaper_init(2.0f, 10.0f, 20.0f, -24.0f);
 }
 
+// the gradient from the original paper, where reference vecs are g = [0,0,1] and b = [bx, 0, bz]  
 void madgwick_gradient(float* g1, float* g2, float* g3, float* g4, float q1, float q2, float q3, float q4)
 {
 	float _2q1 = 2.0f * q1;
@@ -128,6 +131,8 @@ void madgwick_gradient(float* g1, float* g2, float* g3, float* g4, float q1, flo
 	*g4 = 2.0f * (q2 * f1 + q3 * f2 + (-_2q4 * bx + bz * q2) * f4 + (-bx * q1 + bz * q3) * f5 + bx * q2 * f6); 
 }
 
+// implements https://www.sciencedirect.com/science/article/pii/S0888327019303012
+// where a new ref vec for magnetic field is generated via cross product of measurement from acc and gyro
 void improved_madgwick_gradient(float* g1, float* g2, float* g3, float* g4, float q1, float q2, float q3, float q4)
 {
 	float q1q1 = q1 * q1;
@@ -162,9 +167,9 @@ void improved_madgwick_gradient(float* g1, float* g2, float* g3, float* g4, floa
 
 void MadgwickQuaternionUpdate(void)
 {
+	// platform dependant delta_t
 	now = app_timer_cnt_get();
 	deltat = (float)app_timer_cnt_diff_compute(now, lastUpdate) / APP_TIMER_CLOCK_FREQ;
-//	NRF_LOG_INFO("deltat: %d %d", now, lastUpdate);
 	lastUpdate = now;
 	
 	float q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];   // short name local variable for readability
@@ -231,7 +236,7 @@ void MadgwickQuaternionUpdate(void)
 	q[2] = q3;
 	q[3] = q4;
 }
-
+// raw sensor data as input, output calculated quaternion
 void process_raw_motion_data(accel_values_t* acc_ptr, gyro_values_t* gyro_ptr, magn_values_t* magn_ptr, QUAT_DATA* quat_dest_ptr)
 {	
 	int16_t motion_data[9];
@@ -255,32 +260,16 @@ void process_raw_motion_data(accel_values_t* acc_ptr, gyro_values_t* gyro_ptr, m
     r_my = motion_data[7] * 10.*4912./8190.;
     r_mz = motion_data[8] * 10.*4912./8190.;
 	
-	bool is_left_handed = get_if_left_handed_or_not();
-	
-	if (is_left_handed)
-	{
-		ax = r_ay;
-		ay = r_ax;
-		az = r_az;
-		gx = -r_gy * M_PI / 180.0f;
-		gy = -r_gx * M_PI / 180.0f;
-		gz = -r_gz * M_PI / 180.0f;
-		mx = -r_mx;
-		my = -r_my;
-		mz = r_mz;
-	}
-	else
-	{
-		ax = -r_ay;
-		ay = -r_ax;
-		az = r_az;
-		gx = r_gy * M_PI / 180.0f;
-		gy = r_gx * M_PI / 180.0f;
-		gz = -r_gz * M_PI / 180.0f;
-		mx = r_mx;
-		my = r_my;
-		mz = r_mz;
-	}
+	// update based on your sensor registration
+	ax = -r_ay;
+	ay = -r_ax;
+	az = r_az;
+	gx = r_gy * M_PI / 180.0f;
+	gy = r_gx * M_PI / 180.0f;
+	gz = -r_gz * M_PI / 180.0f;
+	mx = r_mx;
+	my = r_my;
+	mz = r_mz;
 
 	for (uint8_t i = 0; i < MADGWICK_ITER_TIMES; i++) MadgwickQuaternionUpdate();
 

@@ -1,3 +1,4 @@
+// implemented several extention to venilla gradient decent, may have better convergence rate with proper param setting 
 #include <math.h>
 
 struct LowpassParams
