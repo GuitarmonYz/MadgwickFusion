@@ -33,8 +33,8 @@ void transient_shaper_init(float attack, float attack_ratio, float release, floa
 
 float transient_shaper_get_gain(float sample_in)
 {
-	float y_slow = arfollower_process(&rms_follower_slow, sample_in);
-	float y_fast = arfollower_process(&rms_follower_fast, sample_in);
+	float y_slow = rms_follower_process(&rms_follower_slow, sample_in);
+	float y_fast = rms_follower_process(&rms_follower_fast, sample_in);
 	
     float diff = y_fast - y_slow;
     float diff_db = 20.0f * log10(diff);
